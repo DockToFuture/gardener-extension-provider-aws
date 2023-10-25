@@ -85,8 +85,8 @@ images:
       availability_requirement: 'low'
 - name: cloud-controller-manager
   sourceRepository: github.com/kubernetes/cloud-provider-aws
-  repository: registry.k8s.io/provider-aws/cloud-controller-manager
-  tag: "v1.27.1"
+  repository: docktofuture/cloud-controller-manager
+  tag: "v1.12"
   targetVersion: ">= 1.27"
   labels:
   - name: 'gardener.cloud/cve-categorisation'
@@ -112,8 +112,8 @@ images:
       availability_requirement: 'low'
 - name: machine-controller-manager-provider-aws
   sourceRepository: github.com/gardener/machine-controller-manager-provider-aws
-  repository: eu.gcr.io/gardener-project/gardener/machine-controller-manager-provider-aws
-  tag: "v0.18.0"
+  repository: docktofuture/machine-controller-manager-provider-aws
+  tag: "v1"
   labels:
   - name: 'gardener.cloud/cve-categorisation'
     value:
