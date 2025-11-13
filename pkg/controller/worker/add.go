@@ -55,7 +55,7 @@ func AddToManagerWithOptions(ctx context.Context, mgr manager.Manager, opts AddO
 		Predicates:             worker.DefaultPredicates(ctx, mgr, opts.IgnoreOperationAnnotation),
 		Type:                   aws.Type,
 		ExtensionClass:         opts.ExtensionClass,
-		AutonomousShootCluster: opts.AutonomousShootCluster,
+		SelfHostedShootCluster: opts.AutonomousShootCluster,
 	})
 }
 

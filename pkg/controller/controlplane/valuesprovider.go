@@ -478,6 +478,13 @@ func (vp *valuesProvider) GetStorageClassesChartValues(
 	}, nil
 }
 
+func (vp *valuesProvider) GetControllersValues(_ context.Context,
+	cp *extensionsv1alpha1.ControlPlane,
+	_ *extensionscontroller.Cluster,
+) ([]string, error) {
+	return []string{"aws-custom-route-controller"}, nil
+}
+
 func (vp *valuesProvider) decodeControlPlaneConfig(cp *extensionsv1alpha1.ControlPlane) (*apisaws.ControlPlaneConfig, error) {
 	cpConfig := &apisaws.ControlPlaneConfig{}
 	if cp.Spec.ProviderConfig != nil {
