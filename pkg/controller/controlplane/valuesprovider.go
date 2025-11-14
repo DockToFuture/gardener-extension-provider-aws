@@ -481,7 +481,8 @@ func (vp *valuesProvider) GetStorageClassesChartValues(
 	}, nil
 }
 
-func (vp *valuesProvider) GetControllersValues(ctx context.Context,
+// GetControllersStatus returns status of controllers and if a requeue is required.
+func (vp *valuesProvider) GetControllersStatus(ctx context.Context,
 	cp *extensionsv1alpha1.ControlPlane,
 	_ *extensionscontroller.Cluster,
 ) ([]extensionsv1alpha1.ControllerConfig, bool, error) {
