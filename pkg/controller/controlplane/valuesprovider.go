@@ -23,9 +23,11 @@ import (
 	"github.com/gardener/gardener/pkg/utils/chart"
 	gutil "github.com/gardener/gardener/pkg/utils/gardener"
 	kutil "github.com/gardener/gardener/pkg/utils/kubernetes"
+	"github.com/gardener/gardener/pkg/utils/kubernetes/health"
 	secretutils "github.com/gardener/gardener/pkg/utils/secrets"
 	secretsmanager "github.com/gardener/gardener/pkg/utils/secrets/manager"
 	versionutils "github.com/gardener/gardener/pkg/utils/version"
+	"github.com/labstack/gommon/log"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -38,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	vpaautoscalingv1 "k8s.io/autoscaler/vertical-pod-autoscaler/pkg/apis/autoscaling.k8s.io/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -478,11 +481,61 @@ func (vp *valuesProvider) GetStorageClassesChartValues(
 	}, nil
 }
 
-func (vp *valuesProvider) GetControllersValues(_ context.Context,
+func (vp *valuesProvider) GetControllersValues(ctx context.Context,
 	cp *extensionsv1alpha1.ControlPlane,
 	_ *extensionscontroller.Cluster,
-) ([]string, error) {
-	return []string{"aws-custom-route-controller"}, nil
+) ([]extensionsv1alpha1.ControllerConfig, bool, error) {
+	type Controller struct {
+		ControllerName      string
+		Kind                string
+		Name                string
+		ConfigurationOption string
+	}
+
+	controllers := []Controller{
+		{
+			ControllerName:      "route-controller",
+			Kind:                "Deployment",
+			Name:                aws.AWSCustomRouteControllerName,
+			ConfigurationOption: "",
+		},
+	}
+
+	currentControllers := make(map[string]bool)
+	requeue := false
+	for _, ctr := range controllers {
+		ready := false
+		switch ctr.Kind {
+		case "Deployment":
+			deployment := &appsv1.Deployment{}
+			if err := vp.client.Get(ctx, client.ObjectKey{Namespace: cp.Namespace, Name: ctr.Name}, deployment); err != nil {
+				if client.IgnoreNotFound(err) != nil {
+					return nil, false, fmt.Errorf("could not get deployment '%s/%s': %w", cp.Namespace, ctr.Name, err)
+				}
+			} else {
+				// Deployment exists, check if it has replicas and is healthy
+				if deployment.Spec.Replicas == nil || *deployment.Spec.Replicas == 0 {
+					log.Info("Controller deployment has 0 replicas", "controller", ctr.Name)
+					requeue = true
+				} else if err := health.CheckDeployment(deployment); err != nil {
+					log.Info("Controller deployment not ready yet", "controller", ctr.Name, "reason", err.Error())
+					requeue = true
+				} else {
+					ready = true
+				}
+			}
+			currentControllers[ctr.ControllerName] = ready
+		}
+	}
+
+	newControllers := make([]extensionsv1alpha1.ControllerConfig, 0, len(currentControllers))
+	for controllerName, ready := range currentControllers {
+		newControllers = append(newControllers, extensionsv1alpha1.ControllerConfig{
+			Name:   controllerName,
+			Active: ready,
+		})
+	}
+	return newControllers, requeue, nil
 }
 
 func (vp *valuesProvider) decodeControlPlaneConfig(cp *extensionsv1alpha1.ControlPlane) (*apisaws.ControlPlaneConfig, error) {
